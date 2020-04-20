@@ -17,7 +17,7 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, date string) ([]*s3.Obj
 
 	input := &s3.ListObjectsInput{
 		Bucket: aws.String(bucket),
-		Prefix: aws.String(fmt.Sprintf("root/%s", date)),
+		// Prefix: aws.String(fmt.Sprintf("root/%s", date)),
 	}
 
 	result, err := s3Session.ListObjects(input)
