@@ -36,6 +36,7 @@ func getTLSConfig(clientcertfile, clientkeyfile, cacertfile string) (*tls.Config
 	return &tlsConfig, nil
 }
 
+// getKafkaProducer creates new basic Kafka-producer.
 func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, tlsClientKey string, tlsCACert string) (sarama.AsyncProducer, error) {
 	// Create kafka producer config
 	config := sarama.NewConfig()
@@ -46,16 +47,17 @@ func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, t
 	if tlsEnabled {
 		tlsConfig, err := getTLSConfig(tlsClientCert, tlsClientKey, tlsCACert)
 		if err != nil {
-			// TODO implement write to log
 			log.Fatal(err)
 		}
 
 		config.Net.TLS.Enable = true
 		config.Net.TLS.Config = tlsConfig
 	}
+
 	return sarama.NewAsyncProducer(brokers, config)
 }
 
+// createKafkaTopic is used for tests.
 func createKafkaTopic(kafkaBrokerHost string, topic string) {
 	// Set broker configuration
 	broker := sarama.NewBroker(kafkaBrokerHost)
@@ -111,14 +113,14 @@ func createKafkaTopic(kafkaBrokerHost string, topic string) {
 
 // ProcessResponse grabs results and errors from kafka async producer
 func ProcessResponse(kafkaProducer sarama.AsyncProducer) {
-	for {
-		select {
-		// Produce was done successfully
-		case result := <-kafkaProducer.Successes():
-			fmt.Println("result:", result)
-			// Produce was failed
-		case err := <-kafkaProducer.Errors():
-			fmt.Println("err:", err)
-		}
-	}
+	// for {
+	// 	select {
+	// 	// Produce was done successfully
+	// 	case result := <-kafkaProducer.Successes():
+	// 		fmt.Println("result:", result)
+	// 		// Produce was failed
+	// 	case err := <-kafkaProducer.Errors():
+	// 		fmt.Println("err:", err)
+	// 	}
+	// }
 }

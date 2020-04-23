@@ -45,7 +45,6 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date stri
 // downloadDateRange: Gets start and end dates and downloads all the files in this ranges from S3 to chanel-buffer
 func downloadDateRange(s3Session *session.Session, bucket string, topic string, start time.Time, end time.Time, dataChan chan []byte, filesCountChan chan int, wg *sync.WaitGroup) {
 	WriteLog(logfileS3, logLevelInfo, componentKafka, fmt.Sprintf("downloadDateRange: StartDate-%s, EndTime %s", start, end))
-	fmt.Printf("downloadDateRange: StartDate-%v, EndTime %v", start, end)
 	s3Downloader := s3manager.NewDownloader(s3Session)
 
 	// Run for all the range (include the 'end' day)

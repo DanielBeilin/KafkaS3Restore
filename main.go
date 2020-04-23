@@ -20,7 +20,7 @@ const (
 	Token              = ""
 	KafkaTopic         = "test_topic"
 	StartDateStr       = "17-04-2020"
-	EndDateStr         = "22-04-2020"
+	EndDateStr         = "23-04-2020"
 )
 
 func main() {
@@ -31,18 +31,24 @@ func main() {
 	endDate, _ := time.Parse("02-01-2006", EndDateStr)
 	daysToRestore := int(endDate.Sub(startDate).Hours()/24) + 1
 
-	// Config S3 storage.
-	credsS3 := credentials.NewStaticCredentials(AwsAccessKeyID, AwsSecretAccessKey, Token)
-	cfgS3 := aws.NewConfig().WithRegion("us-west-1").WithCredentials(credsS3).WithEndpoint(MinioEndpoint).WithDisableSSL(true).WithS3ForcePathStyle(true)
-	sessS3 := session.New(cfgS3)
+	// Init S3 Variables
+	var (
+		credsS3 = credentials.NewStaticCredentials(AwsAccessKeyID, AwsSecretAccessKey, Token)
+		cfgS3   = aws.NewConfig().WithRegion("us-west-1").WithCredentials(credsS3).WithEndpoint(MinioEndpoint).WithDisableSSL(true).WithS3ForcePathStyle(true)
+		sessS3  = session.New(cfgS3)
+	)
 
 	// --------- Create Files in S3 (For Demo) --------
 	// createDemoFilesInS3(sessS3, cfgS3)
 
-	// ----------------- START TEST -------------------
-	dataChan := make(chan []byte)
-	filesCountChan := make(chan int)
-	wg := sync.WaitGroup{}
+	// Init concurrency vars
+	var (
+		dataChan       = make(chan []byte)
+		filesCountChan = make(chan int)
+		wg             = sync.WaitGroup{}
+	)
+
+	// Add a goroutine - The download from S3.
 	wg.Add(1)
 
 	// // Get files from S3 to chanel as buffer
@@ -67,8 +73,8 @@ func main() {
 		// Get the number of files in the current day.
 		filesCount := <-filesCountChan
 		WriteLog(logfileMain, logLevelInfo, componentS3, fmt.Sprintf("There are: %d files in date: %s", filesCount, startDate.AddDate(0, 0, day).Format("2006-01-02")))
-		fmt.Printf("There are: %d files in date: %s", filesCount, startDate.AddDate(0, 0, day).Format("2006-01-02"))
 
+		// Write every file to Kakfa.
 		for fileIndex := 0; fileIndex < filesCount; fileIndex++ {
 			msg := <-dataChan
 			message := sarama.ProducerMessage{Topic: KafkaTopic, Value: sarama.ByteEncoder(msg)}

@@ -1,0 +1,27 @@
+{"time":"2020-04-23 20:58:37.699","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"Kafka Producer","event":"downloadDateRange: StartDate-2020-04-17 00:00:00 +0000 UTC, EndTime 2020-04-22 00:00:00 +0000 UTC"}
+{"time":"2020-04-23 20:58:37.871","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=17/file-4.txt\t to buffer"}
+{"time":"2020-04-23 20:58:37.953","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=17/logs-4.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.117","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=18/file-5.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.201","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=18/logs-5.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.361","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=19/file-6.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.443","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=19/logs-6.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.605","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=20/file-7.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.686","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=20/logs-7.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.848","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=21/file-8.txt\t to buffer"}
+{"time":"2020-04-23 20:58:38.928","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=21/logs-8.txt\t to buffer"}
+{"time":"2020-04-23 20:58:39.089","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=22/file-9.txt\t to buffer"}
+{"time":"2020-04-23 20:58:39.170","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=22/logs-9.txt\t to buffer"}
+{"time":"2020-04-23 20:59:08.986","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"Kafka Producer","event":"downloadDateRange: StartDate-2020-04-17 00:00:00 +0000 UTC, EndTime 2020-04-23 00:00:00 +0000 UTC"}
+{"time":"2020-04-23 20:59:09.151","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=17/file-4.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.234","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=17/logs-4.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.394","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=18/file-5.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.484","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=18/logs-5.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.645","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=19/file-6.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.725","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=19/logs-6.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.885","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=20/file-7.txt\t to buffer"}
+{"time":"2020-04-23 20:59:09.965","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=20/logs-7.txt\t to buffer"}
+{"time":"2020-04-23 20:59:10.124","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=21/file-8.txt\t to buffer"}
+{"time":"2020-04-23 20:59:10.204","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=21/logs-8.txt\t to buffer"}
+{"time":"2020-04-23 20:59:10.364","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=22/file-9.txt\t to buffer"}
+{"time":"2020-04-23 20:59:10.444","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=22/logs-9.txt\t to buffer"}
+{"time":"2020-04-23 20:59:10.605","host":"DESKTOP-CG9MPQA","loglevel":"INFO","component":"S3 Client","event":"Download: \ttest_topic/Year=2020/Month=04/Day=23/logs-10.txt\t to buffer"}
