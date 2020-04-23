@@ -1,16 +1,5 @@
 package main
 
-import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"os"
-	"path"
-	"time"
-
-	"github.com/spf13/viper"
-)
-
 const (
 	logLevelInfo     = "INFO"
 	logLevelError    = "ERROR"
@@ -48,6 +37,7 @@ type ErrorLog struct {
 	Message     string `json:"message"`
 }
 
+/*
 // WriteLog write log as logEvent structure into a log file
 func WriteLog(logfile string, loglevel string, component string, event interface{}) {
 	// Get host name
@@ -80,4 +70,4 @@ func WriteLog(logfile string, loglevel string, component string, event interface
 
 	// Write log event into log file using the logger
 	logger.Println(logEvent)
-}
+}*/

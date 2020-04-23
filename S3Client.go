@@ -1,23 +1,26 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 
+	"bytes"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 )
 
 // function that returns a list of objects in a certin date
-func listObjectsForDate(s3Session *s3.S3, bucket string, date string) ([]*s3.Object, error) {
-
+func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date string) ([]*s3.Object, error) {
 	input := &s3.ListObjectsInput{
 		Bucket: aws.String(bucket),
-		// Prefix: aws.String(fmt.Sprintf("root/%s", date)),
+		Prefix: aws.String(fmt.Sprintf("%s/%s", topic, date)),
 	}
 
 	result, err := s3Session.ListObjects(input)
@@ -41,37 +44,32 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, date string) ([]*s3.Obj
 
 // Download all objects between a given start date and end date
 // TODO move to main.go
-func downloadDateRange(s3Session *session.Session, bucket string, start time.Time, end time.Time) {
-
-	buffer := aws.NewWriteAtBuffer([]byte{})
+func downloadDateRange(s3Session *session.Session, bucket string, topic string, start time.Time, end time.Time, dataChan chan []byte, filesCountChan chan int, wg *sync.WaitGroup) {
 	s3Downloader := s3manager.NewDownloader(s3Session)
-
-	for !start.Equal(end) {
-		objectList, err := listObjectsForDate(s3.New(s3Session), bucket, string(start.Format("2006/01/02")))
+	for end.After(start) || end.Equal(start) {
+		objectList, err := listObjectsForDate(s3.New(s3Session), bucket, topic, string(start.Format("Year=2006/Month=01/Day=02")))
+		filesCountChan <- len(objectList)
 		if err != nil {
 			// TODO implement write to log
 			panic(err)
+		} else {
+			fmt.Println("OK")
 		}
 
-		// downloadObjectList(buffer, s3Downloader, bucket, objectList)
-		for _, element := range objectList {
-			_, err := s3Downloader.Download(buffer, &s3.GetObjectInput{
-				Bucket: aws.String(bucket),
-				Key:    aws.String(*element.Key),
-			})
-			if err != nil {
-				// TODO implement write to log
-				panic(err)
-			}
-		}
+		downloadObjectList(s3Downloader, bucket, objectList, dataChan)
 
-		start.AddDate(0, 0, 1)
+		start = start.AddDate(0, 0, 1)
 	}
+
+	wg.Done()
 }
 
 // returns a buffer
-func downloadObjectList(buffer *aws.WriteAtBuffer, s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object) *aws.WriteAtBuffer {
+func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object, fileChan chan []byte) *aws.WriteAtBuffer {
+	buffer := aws.NewWriteAtBuffer([]byte{})
 	for _, element := range objectsToDownload {
+		fmt.Println("downloadObjectList, DATE: ", *element.Key)
+
 		_, err := s3Downloader.Download(buffer, &s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(*element.Key),
@@ -79,6 +77,11 @@ func downloadObjectList(buffer *aws.WriteAtBuffer, s3Downloader *s3manager.Downl
 		if err != nil {
 			// TODO implement write to log
 			panic(err)
+		} else {
+			// fmt.Printf("\n\nFile name: %v", *element.Key)
+			// fmt.Printf("\n%v", buffer)
+			fileChan <- buffer.Bytes()
+
 		}
 	}
 
@@ -88,4 +91,42 @@ func downloadObjectList(buffer *aws.WriteAtBuffer, s3Downloader *s3manager.Downl
 func exitErrorf(msg string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, msg+"\n", args...)
 	os.Exit(1)
+}
+
+// AddFileToS3 takes in a session, fileDir, s3_Bucket, and s3_Dir_Path
+// In this case fileDir is the local file to read in and upload to S3; in this case we expect it to be local to the code
+// S3 Dir Path is the directory within the S3 Bucket to write to
+func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bucket string, topic string, time time.Time) error {
+
+	f, err := os.Open(localFilePath)
+	if err != nil {
+		fmt.Println("Error while open local file !", err)
+	}
+
+	defer f.Close()
+
+	// Get file size and read the file content into a buffer
+	fileInfo, _ := f.Stat()
+	size := fileInfo.Size()
+	buffer := make([]byte, size)
+	f.Read(buffer)
+
+	key := fmt.Sprintf("/%s/%s/%s", topic, string(time.Format("Year=2006/Month=01/Day=02")), f.Name())
+
+	pufFileOutput, err := s3.New(s, cfg).PutObject(&s3.PutObjectInput{
+		Bucket:             aws.String("connect"),
+		Key:                aws.String(key),
+		Body:               bytes.NewReader(buffer),
+		ContentLength:      aws.Int64(size),
+		ContentType:        aws.String(http.DetectContentType(buffer)),
+		ContentDisposition: aws.String("attachment"),
+	})
+
+	if err != nil {
+		fmt.Println("ERROR !!!!")
+	}
+
+	fmt.Printf("\n\n--pufFileOutput: %v\n--ERR: %v\n", pufFileOutput, err)
+
+	return err
 }

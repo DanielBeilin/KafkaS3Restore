@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/Shopify/sarama"
 )
@@ -34,6 +36,7 @@ func getTLSConfig(clientcertfile, clientkeyfile, cacertfile string) (*tls.Config
 	return &tlsConfig, nil
 }
 
+// getKafkaProducer creates new basic Kafka-producer.
 func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, tlsClientKey string, tlsCACert string) (sarama.AsyncProducer, error) {
 	// Create kafka producer config
 	config := sarama.NewConfig()
@@ -44,7 +47,7 @@ func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, t
 	if tlsEnabled {
 		tlsConfig, err := getTLSConfig(tlsClientCert, tlsClientKey, tlsCACert)
 		if err != nil {
-			// TODO implement write to log 
+			// TODO implement write to log
 			log.Fatal(err)
 		}
 
@@ -52,4 +55,72 @@ func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, t
 		config.Net.TLS.Config = tlsConfig
 	}
 	return sarama.NewAsyncProducer(brokers, config)
+}
+
+// createKafkaTopic is used for tests.
+func createKafkaTopic(kafkaBrokerHost string, topic string) {
+	// Set broker configuration
+	broker := sarama.NewBroker(kafkaBrokerHost)
+
+	// Additional configurations. Check sarama doc for more info
+	config := sarama.NewConfig()
+	config.Version = sarama.V1_0_0_0
+
+	// Open broker connection with configs defined above
+	broker.Open(config)
+
+	// check if the connection was OK
+	connected, err := broker.Connected()
+	if err != nil {
+		log.Print(err.Error())
+	}
+	log.Print(connected)
+
+	// Setup the Topic details in CreateTopicRequest struct
+	topicDetail := &sarama.TopicDetail{}
+	topicDetail.NumPartitions = int32(1)
+	topicDetail.ReplicationFactor = int16(1)
+	topicDetail.ConfigEntries = make(map[string]*string)
+
+	topicDetails := make(map[string]*sarama.TopicDetail)
+	topicDetails[topic] = topicDetail
+
+	request := sarama.CreateTopicsRequest{
+		Timeout:      time.Second * 15,
+		TopicDetails: topicDetails,
+	}
+
+	// Send request to Broker
+	response, err := broker.CreateTopics(&request)
+
+	// handle errors if any
+	if err != nil {
+		log.Printf("%#v", &err)
+	}
+	t := response.TopicErrors
+	for key, val := range t {
+		if val.ErrMsg != nil {
+			fmt.Println("There is an error: ", val.ErrMsg)
+		} else {
+			log.Printf("Topic '%s' created successfully ", key)
+		}
+	}
+	log.Printf("the response is: \t %#v", response)
+
+	// close connection to broker
+	broker.Close()
+}
+
+// ProcessResponse grabs results and errors from kafka async producer
+func ProcessResponse(kafkaProducer sarama.AsyncProducer) {
+	for {
+		select {
+		// Produce was done successfully
+		case result := <-kafkaProducer.Successes():
+			fmt.Println("result:", result)
+			// Produce was failed
+		case err := <-kafkaProducer.Errors():
+			fmt.Println("err:", err)
+		}
+	}
 }
