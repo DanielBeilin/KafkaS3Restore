@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// function that returns a list of objects in a certin date
+// listObjectsForDate: returns a list of S3-objects in a certin date
 func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date string) ([]*s3.Object, error) {
 	input := &s3.ListObjectsInput{
 		Bucket: aws.String(bucket),
@@ -42,62 +42,56 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date stri
 	return result.Contents, nil
 }
 
-// Download all objects between a given start date and end date
-// TODO move to main.go
+// downloadDateRange: Gets start and end dates and downloads all the files in this ranges from S3 to chanel-buffer
 func downloadDateRange(s3Session *session.Session, bucket string, topic string, start time.Time, end time.Time, dataChan chan []byte, filesCountChan chan int, wg *sync.WaitGroup) {
+	WriteLog(logfileS3, logLevelInfo, componentKafka, fmt.Sprintf("downloadDateRange: StartDate-%s, EndTime %s", start, end))
+	fmt.Printf("downloadDateRange: StartDate-%v, EndTime %v", start, end)
 	s3Downloader := s3manager.NewDownloader(s3Session)
+
+	// Run for all the range (include the 'end' day)
 	for end.After(start) || end.Equal(start) {
 		objectList, err := listObjectsForDate(s3.New(s3Session), bucket, topic, string(start.Format("Year=2006/Month=01/Day=02")))
-		filesCountChan <- len(objectList)
 		if err != nil {
-			// TODO implement write to log
 			panic(err)
-		} else {
-			fmt.Println("OK")
 		}
+
+		// Send the count of files in the current day to the chanel.
+		filesCountChan <- len(objectList)
 
 		downloadObjectList(s3Downloader, bucket, objectList, dataChan)
 
+		// Go to the next day.
 		start = start.AddDate(0, 0, 1)
 	}
 
 	wg.Done()
 }
 
-// returns a buffer
-func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object, fileChan chan []byte) *aws.WriteAtBuffer {
+// downloadObjectList: Sends the every file in the S3 directory to the chanel as buffer.
+func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object, fileChan chan []byte) {
 	buffer := aws.NewWriteAtBuffer([]byte{})
 	for _, element := range objectsToDownload {
-		fmt.Println("downloadObjectList, DATE: ", *element.Key)
 
+		WriteLog(logfileS3, logLevelInfo, componentS3, fmt.Sprintf("Download: \t%s\t to buffer", *element.Key))
+
+		// Download file content to buffer
 		_, err := s3Downloader.Download(buffer, &s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(*element.Key),
 		})
 		if err != nil {
-			// TODO implement write to log
 			panic(err)
 		} else {
-			// fmt.Printf("\n\nFile name: %v", *element.Key)
-			// fmt.Printf("\n%v", buffer)
+			// Write buffer to the chanel
 			fileChan <- buffer.Bytes()
-
 		}
 	}
-
-	return buffer
 }
 
-func exitErrorf(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	os.Exit(1)
-}
+// AddFileToS3 Writes a file to S3. This Function is for initialize tests only.
+func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bucket string, topic string, time time.Time) {
 
-// AddFileToS3 takes in a session, fileDir, s3_Bucket, and s3_Dir_Path
-// In this case fileDir is the local file to read in and upload to S3; in this case we expect it to be local to the code
-// S3 Dir Path is the directory within the S3 Bucket to write to
-func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bucket string, topic string, time time.Time) error {
-
+	// Open local file
 	f, err := os.Open(localFilePath)
 	if err != nil {
 		fmt.Println("Error while open local file !", err)
@@ -111,9 +105,10 @@ func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bu
 	buffer := make([]byte, size)
 	f.Read(buffer)
 
+	// Generate the name of the S3 file according its topic and name.
 	key := fmt.Sprintf("/%s/%s/%s", topic, string(time.Format("Year=2006/Month=01/Day=02")), f.Name())
 
-	pufFileOutput, err := s3.New(s, cfg).PutObject(&s3.PutObjectInput{
+	putFileOutput, err := s3.New(s, cfg).PutObject(&s3.PutObjectInput{
 		Bucket:             aws.String("connect"),
 		Key:                aws.String(key),
 		Body:               bytes.NewReader(buffer),
@@ -123,10 +118,8 @@ func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bu
 	})
 
 	if err != nil {
-		fmt.Println("ERROR !!!!")
+		WriteLog(logfileS3, logLevelError, componentS3, fmt.Sprintf("Error when put the file in S3:\t\t %v", err))
 	}
 
-	fmt.Printf("\n\n--pufFileOutput: %v\n--ERR: %v\n", pufFileOutput, err)
-
-	return err
+	WriteLog(logfileS3, logLevelInfo, componentS3, fmt.Sprintf("Put file successfully: \t\t%v", putFileOutput))
 }

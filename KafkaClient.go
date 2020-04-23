@@ -36,7 +36,6 @@ func getTLSConfig(clientcertfile, clientkeyfile, cacertfile string) (*tls.Config
 	return &tlsConfig, nil
 }
 
-// getKafkaProducer creates new basic Kafka-producer.
 func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, tlsClientKey string, tlsCACert string) (sarama.AsyncProducer, error) {
 	// Create kafka producer config
 	config := sarama.NewConfig()
@@ -57,7 +56,6 @@ func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, t
 	return sarama.NewAsyncProducer(brokers, config)
 }
 
-// createKafkaTopic is used for tests.
 func createKafkaTopic(kafkaBrokerHost string, topic string) {
 	// Set broker configuration
 	broker := sarama.NewBroker(kafkaBrokerHost)

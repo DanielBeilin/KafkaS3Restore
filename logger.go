@@ -1,16 +1,28 @@
 package main
 
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path"
+	"time"
+)
+
 const (
 	logLevelInfo     = "INFO"
 	logLevelError    = "ERROR"
 	logLevelPanic    = "PANIC"
 	componentKafka   = "Kafka Producer"
-	componentRedis   = "Redis Client"
+	componentS3      = "S3 Client"
 	componentHTTP    = "HTTP Server"
 	componentDecoder = "Request Decoder"
 	componentAuth    = "Authentication"
-	logfileAdmin     = "admin"
+	logfileMain      = "main"
+	logfileKafka     = "kafka"
+	logfileS3        = "s3"
 	timeFormat       = "2006-01-02 15:04:05.000"
+	configLogDir     = "."
 )
 
 // logEvent represents a generic log event that is written into a log file
@@ -37,7 +49,6 @@ type ErrorLog struct {
 	Message     string `json:"message"`
 }
 
-/*
 // WriteLog write log as logEvent structure into a log file
 func WriteLog(logfile string, loglevel string, component string, event interface{}) {
 	// Get host name
@@ -54,7 +65,7 @@ func WriteLog(logfile string, loglevel string, component string, event interface
 	logEvent := string(logEventBytes)
 
 	// Open log file
-	f, err := os.OpenFile(fmt.Sprintf("%s.log", path.Join(viper.GetString(configLogDir), logfile)),
+	f, err := os.OpenFile(fmt.Sprintf("%s.log", path.Join("./", logfile)),
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
 	// Handle error in opening log file
@@ -63,11 +74,10 @@ func WriteLog(logfile string, loglevel string, component string, event interface
 		// Cannot write into log file, print log
 		log.Println(logEvent)
 	}
-	defer f.Close()
 
 	// Create logger
 	logger := log.New(f, "", 0)
 
 	// Write log event into log file using the logger
 	logger.Println(logEvent)
-}*/
+}
