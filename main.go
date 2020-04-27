@@ -1,30 +1,60 @@
-package main
+ package main
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
-
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/spf13/viper"
 )
 
 const (
+	configPrefix                = "kafka_restore"
+	configKafkaBrokers          = "kafka_brokers"
+	configKafkaBrokersDelimiter = ","
+	configKafkaTLSEnabled       = "kafka_tls_enabled"
+	configKafkaTLSClientCert    = "kafka_tls_client_cert"
+	configKafkaTLSClientKey     = "kafka_tls_client_key"
+	configKafkaTLSCACert        = "kafka_tls_ca_cert"
+	configS3Endpoint            = "s3_server_endpoint"
+	configS3RestoreBucket       = "s3_restore_bucket"
+	configAwsSecretKey          = "s3_secret_key"
+	configAwsAccesskey          = "s3_access_key"
+	configAwsToken              = ""
+	configLogDir                = "logdir"
+	configRestoreTopic          = "kafka_restore_topic"
+)
+
+/*const (
 	MinioEndpoint      = "bdservices-minio.idf-cts.com:9000"
 	KafkaEndpoint      = "raz-kafka.idf-cts.com:9092"
 	AwsAccessKeyID     = "public_key"
 	AwsSecretAccessKey = "public_secret"
 	Token              = ""
 	Topic              = "test_topic"
-)
+)*/
 
 func main() {
+	// Set configuration auto prefix
+	viper.SetEnvPrefix(configPrefix)
+	viper.AutomaticEnv()
+	viper.GetViper().AllowEmptyEnv(true)
+
 	// --------- S3 config --------
-	credsS3 := credentials.NewStaticCredentials(AwsAccessKeyID, AwsSecretAccessKey, Token)
-	cfgS3 := aws.NewConfig().WithRegion("us-west-1").WithCredentials(credsS3).WithEndpoint(MinioEndpoint).WithDisableSSL(true).WithS3ForcePathStyle(true)
+	credsS3 := credentials.NewStaticCredentials(viper.GetString(configAwsAccesskey),
+		viper.GetString(configAwsSecretKey),
+		viper.GetString(configAwsToken))
+
+	cfgS3 := aws.NewConfig().WithRegion("us-west-1").
+		WithCredentials(credsS3).
+		WithEndpoint(viper.GetString(configS3Endpoint)).
+		WithDisableSSL(true).WithS3ForcePathStyle(true)
+
 	sessS3 := session.New(cfgS3)
 
 	// --------- Create Files in S3 (For Demo) --------
@@ -37,25 +67,36 @@ func main() {
 	wg.Add(1)
 
 	// S3-CLIENT
-	go downloadDateRange(sessS3, "connect", "test_topic", time.Now().AddDate(0, 0, -3), time.Now(), mainChan, filesCountChan, &wg)
+	go downloadDateRange(sessS3,
+		viper.GetString(configS3RestoreBucket),
+		viper.GetString(configRestoreTopic),
+		time.Now().AddDate(0, 0, -3),
+		time.Now(), mainChan, filesCountChan, &wg)
 
 	// KAFKA_CLIENT
-	producer, err := getKafkaProducer([]string{KafkaEndpoint}, false, "", "", "")
+	kafkaProducer, kafkaErr := getKafkaProducer(
+		strings.Split(viper.GetString(configKafkaBrokers), configKafkaBrokersDelimiter),
+		viper.GetBool(configKafkaTLSEnabled),
+		viper.GetString(configKafkaTLSClientCert),
+		viper.GetString(configKafkaTLSClientKey),
+		viper.GetString(configKafkaTLSCACert),
+	)
 
-	if err != nil {
-		panic(err)
+	if kafkaErr != nil {
+		// TODO write error to log file
+		panic(kafkaErr)
 	}
 
-	defer closeKafkaProducer(producer)
-	go ProcessResponse(producer)
+	defer closeKafkaProducer(kafkaProducer)
+	go ProcessResponse(kafkaProducer)
 
 	for day := 0; day < 4; day++ {
 		filesCount := <-filesCountChan
 		fmt.Println("There are: ", filesCount, "Files")
 		for i := 0; i < filesCount; i++ {
 			msg := <-mainChan
-			message := sarama.ProducerMessage{Topic: Topic, Value: sarama.ByteEncoder(msg)}
-			producer.Input() <- &message
+			message := sarama.ProducerMessage{Topic: viper.GetString(configRestoreTopic), Value: sarama.ByteEncoder(msg)}
+			kafkaProducer.Input() <- &message
 		}
 	}
 
@@ -72,6 +113,7 @@ func closeKafkaProducer(producer sarama.AsyncProducer) {
 	fmt.Println("Producer closed")
 }
 
+/*
 // createDemoFilesInS3 is used for create demo files in S3, Only for tests.
 func createDemoFilesInS3(sessS3 *session.Session, cfgS3 *aws.Config) {
 	const FileBasicName string = "logs"
@@ -84,3 +126,4 @@ func createDemoFilesInS3(sessS3 *session.Session, cfgS3 *aws.Config) {
 		AddFileToS3(sessS3, cfgS3, fmt.Sprintf("%s-%d.txt", FileBasicName, i), "connect", Topic, demoDate)
 	}
 }
+*/

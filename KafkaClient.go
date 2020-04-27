@@ -123,4 +123,4 @@ func ProcessResponse(kafkaProducer sarama.AsyncProducer) {
 			fmt.Println("err:", err)
 		}
 	}
-}
+ }
