@@ -12,14 +12,15 @@ import (
 )
 
 const (
-	logLevelInfo     = "INFO"
-	logLevelError    = "ERROR"
-	logLevelPanic    = "PANIC"
-	componentKafka   = "Kafka Producer"
-	componentS3      = "S3 client"
-	componentAuth    = "Authentication"
-	logfileAdmin     = "admin"
-	timeFormat       = "2006-01-02 15:04:05.000"
+	logLevelInfo   = "INFO"
+	logLevelError  = "ERROR"
+	logLevelPanic  = "PANIC"
+	componentKafka = "Kafka Producer"
+	componentS3    = "S3 client"
+	componentMain  = "Main"
+	componentAuth  = "Authentication"
+	logfileAdmin   = "admin"
+	timeFormat     = "2006-01-02 15:04:05.000"
 )
 
 // logEvent represents a generic log event that is written into a log file

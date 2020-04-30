@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"sync"
@@ -39,23 +40,16 @@ const (
 	configLogDir = "logdir"
 )
 
-/*const (
-	MinioEndpoint      = "bdservices-minio.idf-cts.com:9000"
-	KafkaEndpoint      = "raz-kafka.idf-cts.com:9092"
-	AwsAccessKeyID     = "public_key"
-	AwsSecretAccessKey = "public_secret"
-	Token              = ""
-	Topic              = "test_topic"
-)*/
-
 func main() {
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, "Start Kafka-S3-Restore program:")
+
 	// This variable is to massure runtime.
 	start := time.Now()
 
 	// This values are for debugging purposes
-	viper.SetDefault(configStartRestoreDate, time.Date(2020, 04, 26, 0, 0, 0, 0, time.UTC))
+	viper.SetDefault(configStartRestoreDate, time.Date(2020, 04, 27, 0, 0, 0, 0, time.UTC))
 	viper.SetDefault(configEndRestoreDate, time.Date(2020, 04, 27, 0, 0, 0, 0, time.UTC))
-	viper.SetDefault(configKafkaBrokers, "raz-kafka.idf-cts.com:9092")
+	viper.SetDefault(configKafkaBrokers, "raz-kafka.idf-cts.com:9093")
 	viper.SetDefault(configKafkaTLSEnabled, false)
 	viper.SetDefault(configS3Endpoint, "http://13.93.111.67:9000")
 	viper.SetDefault(configS3RestoreBucket, "danielkafkatest")
@@ -65,6 +59,10 @@ func main() {
 	viper.SetDefault(configSourcerTopic, "daniel_topic")
 	viper.SetDefault(configAwsForcePathStyle, true)
 	viper.SetDefault(configAwsDisabledSSl, true)
+
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("Start day: \t %v", viper.GetTime(configStartRestoreDate)))
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("End day:\t %v", viper.GetTime(configEndRestoreDate)))
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("Initializing configurations..."))
 
 	// Set configuration auto prefix
 	viper.SetEnvPrefix(configPrefix)
@@ -92,7 +90,7 @@ func main() {
 	mainChan := make(chan []byte)
 	filesCountChan := make(chan int)
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(1)
 
 	brokers := viper.GetString(configKafkaBrokers)
 	topic := viper.GetString(configRestoreTopic)
@@ -126,21 +124,25 @@ func main() {
 	go ProcessResponse(kafkaProducer)
 
 	dayDiff := int(viper.GetTime(configEndRestoreDate).Sub(viper.GetTime(configStartRestoreDate)).Hours() / 24)
+	const newLineChar = byte('\n')
 
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, "Finish Initializing. Start Restore to Kafka from S3")
 	for day := 0; day <= dayDiff; day++ {
 		filesCount := <-filesCountChan
-		fmt.Println("There are: ", filesCount, "Files")
-		for i := 0; i < filesCount; i++ {
+
+		WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("There are: %d files in day %d", filesCount, day))
+
+		for fileIndex := 0; fileIndex < filesCount; fileIndex++ {
 			byteStream := <-mainChan
+			lines := bytes.Split(byteStream, []byte{newLineChar})
+			WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("Now processing file #%d", fileIndex))
+
 			// This loop reads the file line by line and sends it to kafka
-			/* FIXME, when you read line by line, the producer stops working and the program freezes */
-			for _, line := range strings.Split(string(byteStream), "\n") {
-				if line == "" {
-					continue
+			for _, line := range lines {
+				if len(line) > 0 {
+					message := sarama.ProducerMessage{Topic: viper.GetString(configRestoreTopic), Value: sarama.ByteEncoder(line)}
+					kafkaProducer.Input() <- &message
 				}
-				fmt.Println(line)
-				message := sarama.ProducerMessage{Topic: viper.GetString(configRestoreTopic), Value: sarama.ByteEncoder(line)}
-				kafkaProducer.Input() <- &message
 			}
 		}
 	}

@@ -117,9 +117,9 @@ func ProcessResponse(kafkaProducer sarama.AsyncProducer) {
 	for {
 		select {
 		// Produce was done successfully
-		/*case result := <-kafkaProducer.Successes():
+		case result := <-kafkaProducer.Successes():
 			fmt.Println("result:", result)
-		// Produce was failed*/
+		// Produce was failed
 		case err := <-kafkaProducer.Errors():
 			fmt.Println("err:", err)
 			WriteLog(logfileAdmin, logLevelPanic, componentKafka, err.Error())

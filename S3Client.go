@@ -23,8 +23,9 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date stri
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(fmt.Sprintf("topics/%s/%s", topic, date)),
 	}
-
+	fmt.Println("AFTER LIST S3")
 	result, err := s3Session.ListObjects(input)
+
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -39,15 +40,17 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date stri
 		}
 		return nil, err
 	}
+
 	return result.Contents, nil
 }
 
 // Download all objects between a given start date and end date
 // move to main.go
 func downloadDateRange(s3Session *session.Session, bucket string, topic string, start time.Time, end time.Time, mainChan chan []byte, filesCountChan chan int, wg *sync.WaitGroup) {
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Start downloadDateRange from %v to %v", start, end))
 	s3Downloader := s3manager.NewDownloader(s3Session)
 	for end.After(start) || end.Equal(start) {
-		fmt.Println("downloadging files for day")
+		WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Downloadging files for day %v", start))
 		objectList, err := listObjectsForDate(s3.New(s3Session), bucket, topic, string(start.Format("year=2006/month=01/day=02")))
 		filesCountChan <- len(objectList)
 		if err != nil {
@@ -60,21 +63,20 @@ func downloadDateRange(s3Session *session.Session, bucket string, topic string, 
 
 		downloadObjectList(s3Downloader, bucket, objectList, mainChan)
 
+		WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Finish to download files for day %v", start))
 		start = start.AddDate(0, 0, 1)
 	}
 
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Finish to download files from S3"))
 	wg.Done()
 }
 
 // returns a buffer
 // TODO check if buffer empties for each day
 func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object, mainChan chan []byte) {
-	fmt.Println("download object list")
-	// buffer := make([]byte,64)
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Start downloadObjectList"))
 	buffer := aws.NewWriteAtBuffer([]byte{})
 	for _, element := range objectsToDownload {
-		fmt.Println("downloadObjectList, DATE: ", *element.Key)
-
 		_, err := s3Downloader.Download(buffer, &s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(*element.Key),
@@ -83,8 +85,8 @@ func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objec
 			WriteLog(logfileAdmin, logLevelPanic, componentS3, err.Error())
 			panic(err)
 		} else {
-			// fmt.Printf("\n\nFile name: %v", *element.Key)
-			// fmt.Printf("\n%v", buffer)
+
+			WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Write buffer to chanel"))
 			mainChan <- buffer.Bytes()
 		}
 	}
