@@ -47,7 +47,7 @@ func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, t
 	if tlsEnabled {
 		tlsConfig, err := getTLSConfig(tlsClientCert, tlsClientKey, tlsCACert)
 		if err != nil {
-			// TODO implement write to log
+			WriteLog(logfileAdmin, logLevelError, componentKafka, err.Error())
 			log.Fatal(err)
 		}
 
@@ -91,16 +91,17 @@ func createKafkaTopic(kafkaBrokerHost string, topic string) {
 	}
 
 	// Send request to Broker
-	response, err := broker.CreateTopics(&request)
+	response, KafkaErr := broker.CreateTopics(&request)
 
 	// handle errors if any
-	if err != nil {
+	if KafkaErr != nil {
 		log.Printf("%#v", &err)
 	}
 	t := response.TopicErrors
 	for key, val := range t {
 		if val.ErrMsg != nil {
-			fmt.Println("There is an error: ", val.ErrMsg)
+			log.Println("There is an error: ", val.ErrMsg)
+			WriteLog(logfileAdmin, logLevelPanic, componentKafka, val.ErrMsg)
 		} else {
 			log.Printf("Topic '%s' created successfully ", key)
 		}
@@ -118,9 +119,10 @@ func ProcessResponse(kafkaProducer sarama.AsyncProducer) {
 		// Produce was done successfully
 		case result := <-kafkaProducer.Successes():
 			fmt.Println("result:", result)
-			// Produce was failed
+		// Produce was failed
 		case err := <-kafkaProducer.Errors():
 			fmt.Println("err:", err)
+			WriteLog(logfileAdmin, logLevelPanic, componentKafka, err.Error())
 		}
 	}
- }
+}

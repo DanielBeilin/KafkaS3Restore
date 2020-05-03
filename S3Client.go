@@ -18,12 +18,14 @@ import (
 
 // function that returns a list of objects in a certin date
 func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date string) ([]*s3.Object, error) {
+	fmt.Println("Listing objects")
 	input := &s3.ListObjectsInput{
 		Bucket: aws.String(bucket),
-		Prefix: aws.String(fmt.Sprintf("%s/%s", topic, date)),
+		Prefix: aws.String(fmt.Sprintf("topics/%s/%s", topic, date)),
 	}
-
+	fmt.Println("AFTER LIST S3")
 	result, err := s3Session.ListObjects(input)
+
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -33,59 +35,61 @@ func listObjectsForDate(s3Session *s3.S3, bucket string, topic string, date stri
 				fmt.Println(aerr.Error())
 			}
 		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
+			WriteLog(logfileAdmin, logLevelPanic, componentS3, err.Error())
 			fmt.Println(err.Error())
 		}
 		return nil, err
 	}
+
 	return result.Contents, nil
 }
 
 // Download all objects between a given start date and end date
-// TODO move to main.go
-func downloadDateRange(s3Session *session.Session, bucket string, topic string, start time.Time, end time.Time, dataChan chan []byte, filesCountChan chan int, wg *sync.WaitGroup) {
+// move to main.go
+func downloadDateRange(s3Session *session.Session, bucket string, topic string, start time.Time, end time.Time, mainChan chan []byte, filesCountChan chan int, wg *sync.WaitGroup) {
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Start downloadDateRange from %v to %v", start, end))
 	s3Downloader := s3manager.NewDownloader(s3Session)
 	for end.After(start) || end.Equal(start) {
-		objectList, err := listObjectsForDate(s3.New(s3Session), bucket, topic, string(start.Format("Year=2006/Month=01/Day=02")))
+		WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Downloadging files for day %v", start))
+		objectList, err := listObjectsForDate(s3.New(s3Session), bucket, topic, string(start.Format("year=2006/month=01/day=02")))
 		filesCountChan <- len(objectList)
 		if err != nil {
-			// TODO implement write to log
+			WriteLog(logfileAdmin, logLevelPanic, componentS3, err.Error())
+			fmt.Println(err.Error())
 			panic(err)
 		} else {
 			fmt.Println("OK")
 		}
 
-		downloadObjectList(s3Downloader, bucket, objectList, dataChan)
+		downloadObjectList(s3Downloader, bucket, objectList, mainChan)
 
+		WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Finish to download files for day %v", start))
 		start = start.AddDate(0, 0, 1)
 	}
 
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Finish to download files from S3"))
 	wg.Done()
 }
 
 // returns a buffer
-func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object, fileChan chan []byte) *aws.WriteAtBuffer {
+// TODO check if buffer empties for each day
+func downloadObjectList(s3Downloader *s3manager.Downloader, bucket string, objectsToDownload []*s3.Object, mainChan chan []byte) {
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Start downloadObjectList"))
 	buffer := aws.NewWriteAtBuffer([]byte{})
 	for _, element := range objectsToDownload {
-		fmt.Println("downloadObjectList, DATE: ", *element.Key)
-
 		_, err := s3Downloader.Download(buffer, &s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(*element.Key),
 		})
 		if err != nil {
-			// TODO implement write to log
+			WriteLog(logfileAdmin, logLevelPanic, componentS3, err.Error())
 			panic(err)
 		} else {
-			// fmt.Printf("\n\nFile name: %v", *element.Key)
-			// fmt.Printf("\n%v", buffer)
-			fileChan <- buffer.Bytes()
 
+			WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("Write buffer to chanel"))
+			mainChan <- buffer.Bytes()
 		}
 	}
-
-	return buffer
 }
 
 func exitErrorf(msg string, args ...interface{}) {
@@ -100,7 +104,8 @@ func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bu
 
 	f, err := os.Open(localFilePath)
 	if err != nil {
-		fmt.Println("Error while open local file !", err)
+		WriteLog(logfileAdmin, logLevelPanic, componentS3, err.Error())
+		fmt.Println("Error while opening local file !", err)
 	}
 
 	defer f.Close()
@@ -123,7 +128,8 @@ func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bu
 	})
 
 	if err != nil {
-		fmt.Println("ERROR !!!!")
+		WriteLog(logfileAdmin, logLevelPanic, componentS3, err.Error())
+		panic(err)
 	}
 
 	fmt.Printf("\n\n--pufFileOutput: %v\n--ERR: %v\n", pufFileOutput, err)

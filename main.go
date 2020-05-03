@@ -1,6 +1,7 @@
- package main
+package main
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 )
 
 const (
+	// Kafka consts
 	configPrefix                = "kafka_restore"
 	configKafkaBrokers          = "kafka_brokers"
 	configKafkaBrokersDelimiter = ","
@@ -21,39 +23,63 @@ const (
 	configKafkaTLSClientCert    = "kafka_tls_client_cert"
 	configKafkaTLSClientKey     = "kafka_tls_client_key"
 	configKafkaTLSCACert        = "kafka_tls_ca_cert"
-	configS3Endpoint            = "s3_server_endpoint"
-	configS3RestoreBucket       = "s3_restore_bucket"
-	configAwsSecretKey          = "s3_secret_key"
-	configAwsAccesskey          = "s3_access_key"
-	configAwsToken              = ""
-	configLogDir                = "logdir"
 	configRestoreTopic          = "kafka_restore_topic"
+	configSourcerTopic          = "kafka_source_topic"
+
+	// S3 consts
+	configS3Endpoint        = "s3_server_endpoint"
+	configS3RestoreBucket   = "s3_restore_bucket"
+	configAwsSecretKey      = "s3_secret_key"
+	configAwsAccesskey      = "s3_access_key"
+	configAwsToken          = ""
+	configStartRestoreDate  = "start_restore_date"
+	configEndRestoreDate    = "end_restore_date"
+	configAwsDisabledSSl    = " s3_disabled_ssl"
+	configAwsForcePathStyle = "force_path_style"
+
+	configLogDir = "logdir"
 )
 
-/*const (
-	MinioEndpoint      = "bdservices-minio.idf-cts.com:9000"
-	KafkaEndpoint      = "raz-kafka.idf-cts.com:9092"
-	AwsAccessKeyID     = "public_key"
-	AwsSecretAccessKey = "public_secret"
-	Token              = ""
-	Topic              = "test_topic"
-)*/
-
 func main() {
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, "Start Kafka-S3-Restore program:")
+
+	// This variable is to massure runtime.
+	start := time.Now()
+
+	// This values are for debugging purposes
+	viper.SetDefault(configStartRestoreDate, time.Date(2020, 04, 27, 0, 0, 0, 0, time.UTC))
+	viper.SetDefault(configEndRestoreDate, time.Date(2020, 04, 27, 0, 0, 0, 0, time.UTC))
+	viper.SetDefault(configKafkaBrokers, "raz-kafka.idf-cts.com:9093")
+	viper.SetDefault(configKafkaTLSEnabled, false)
+	viper.SetDefault(configS3Endpoint, "http://13.93.111.67:9000")
+	viper.SetDefault(configS3RestoreBucket, "danielkafkatest")
+	viper.SetDefault(configAwsSecretKey, "public_secret")
+	viper.SetDefault(configAwsAccesskey, "public_key")
+	viper.SetDefault(configRestoreTopic, "daniel_topic_test")
+	viper.SetDefault(configSourcerTopic, "daniel_topic")
+	viper.SetDefault(configAwsForcePathStyle, true)
+	viper.SetDefault(configAwsDisabledSSl, true)
+
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("Start day: \t %v", viper.GetTime(configStartRestoreDate)))
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("End day:\t %v", viper.GetTime(configEndRestoreDate)))
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("Initializing configurations..."))
+
 	// Set configuration auto prefix
 	viper.SetEnvPrefix(configPrefix)
 	viper.AutomaticEnv()
 	viper.GetViper().AllowEmptyEnv(true)
 
 	// --------- S3 config --------
-	credsS3 := credentials.NewStaticCredentials(viper.GetString(configAwsAccesskey),
+	credsS3 := credentials.NewStaticCredentials(
+		viper.GetString(configAwsAccesskey),
 		viper.GetString(configAwsSecretKey),
-		viper.GetString(configAwsToken))
+		configAwsToken)
 
 	cfgS3 := aws.NewConfig().WithRegion("us-west-1").
 		WithCredentials(credsS3).
 		WithEndpoint(viper.GetString(configS3Endpoint)).
-		WithDisableSSL(true).WithS3ForcePathStyle(true)
+		WithDisableSSL(viper.GetBool(configAwsDisabledSSl)).
+		WithS3ForcePathStyle(viper.GetBool(configAwsForcePathStyle))
 
 	sessS3 := session.New(cfgS3)
 
@@ -66,12 +92,19 @@ func main() {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
+	brokers := viper.GetString(configKafkaBrokers)
+	topic := viper.GetString(configRestoreTopic)
+	stardt := viper.GetTime(configStartRestoreDate)
+
+	fmt.Println(brokers, topic, stardt)
+
 	// S3-CLIENT
 	go downloadDateRange(sessS3,
 		viper.GetString(configS3RestoreBucket),
-		viper.GetString(configRestoreTopic),
-		time.Now().AddDate(0, 0, -3),
-		time.Now(), mainChan, filesCountChan, &wg)
+		viper.GetString(configSourcerTopic),
+		viper.GetTime(configStartRestoreDate),
+		viper.GetTime(configEndRestoreDate),
+		mainChan, filesCountChan, &wg)
 
 	// KAFKA_CLIENT
 	kafkaProducer, kafkaErr := getKafkaProducer(
@@ -83,30 +116,49 @@ func main() {
 	)
 
 	if kafkaErr != nil {
-		// TODO write error to log file
+		WriteLog(logfileAdmin, logLevelPanic, componentKafka, kafkaErr.Error())
 		panic(kafkaErr)
 	}
 
 	defer closeKafkaProducer(kafkaProducer)
 	go ProcessResponse(kafkaProducer)
 
-	for day := 0; day < 4; day++ {
+	dayDiff := int(viper.GetTime(configEndRestoreDate).Sub(viper.GetTime(configStartRestoreDate)).Hours() / 24)
+	const newLineChar = byte('\n')
+
+	WriteLog(logfileAdmin, logLevelInfo, componentMain, "Finish Initializing. Start Restore to Kafka from S3")
+	for day := 0; day <= dayDiff; day++ {
 		filesCount := <-filesCountChan
-		fmt.Println("There are: ", filesCount, "Files")
-		for i := 0; i < filesCount; i++ {
-			msg := <-mainChan
-			message := sarama.ProducerMessage{Topic: viper.GetString(configRestoreTopic), Value: sarama.ByteEncoder(msg)}
-			kafkaProducer.Input() <- &message
+
+		WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("There are: %d files in day %d", filesCount, day))
+
+		for fileIndex := 0; fileIndex < filesCount; fileIndex++ {
+			byteStream := <-mainChan
+			lines := bytes.Split(byteStream, []byte{newLineChar})
+			WriteLog(logfileAdmin, logLevelInfo, componentMain, fmt.Sprintf("Now processing file #%d", fileIndex))
+
+			// This loop reads the file line by line and sends it to kafka
+			for _, line := range lines {
+				if len(line) > 0 {
+					message := sarama.ProducerMessage{Topic: viper.GetString(configRestoreTopic), Value: sarama.ByteEncoder(line)}
+					kafkaProducer.Input() <- &message
+				}
+			}
 		}
 	}
 
 	wg.Wait()
+
+	// This variable is to massure runtime.
+	elapsed := time.Since(start)
+	fmt.Println("Binomial took ", elapsed)
 }
 
 // closeKafkaProducer closed the kafka-producer, and prints errors if needed.
 func closeKafkaProducer(producer sarama.AsyncProducer) {
 	err := producer.Close()
 	if err != nil {
+		WriteLog(logfileAdmin, logLevelPanic, componentKafka, err.Error())
 		fmt.Println("Error closing producer: ", err)
 		return
 	}
