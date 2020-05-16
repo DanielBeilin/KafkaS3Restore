@@ -136,3 +136,36 @@ func AddFileToS3(s *session.Session, cfg *aws.Config, localFilePath string, s3Bu
 
 	return err
 }
+
+// GetClientCerdentials returns the cert and key for a given project
+func GetClientCerdentials(s3Session *session.Session, projectName string, projectSite string, projectDepType string) (ClientCert, ClientKey []byte, err error) {
+	s3Downloader := s3manager.NewDownloader(s3Session)
+	// The path to the certificates is bucket/Component/projectName/Site/Deployment/
+	path := fmt.Sprintf("kafka/%s/%s/client", projectDepType,projectSite)
+
+	buffer := aws.NewWriteAtBuffer([]byte{})
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("retriveing client certificate"))
+	_, ClientError := s3Downloader.Download(buffer, &s3.GetObjectInput{
+		Bucket: aws.String(projectName),
+		Key:    aws.String(fmt.Sprintf("%s/%s-kafka-%s-%s-client.%s.pem", path,projectName,projectDepType,projectSite,dnsSuffix)),
+	})
+	if ClientError != nil {
+		return nil, nil, ClientError
+	}
+	ClientCertString := buffer.Bytes()
+
+	buffer = aws.NewWriteAtBuffer([]byte{})
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("retriveing client key"))
+	_, KeyError := s3Downloader.Download(buffer, &s3.GetObjectInput{
+		Bucket: aws.String(projectName),
+		Key:    aws.String(fmt.Sprintf("%s/%s-kafka-%s-%s-client.%s.key", path,projectName,projectDepType,projectSite,dnsSuffix)),
+	})
+	if ClientError != nil {
+		return nil, nil, KeyError
+	}
+	ClientKeyString := buffer.Bytes()
+
+	WriteLog(logfileAdmin, logLevelInfo, componentS3, fmt.Sprintf("retrived credentials successfully"))
+	return ClientCertString, ClientKeyString, nil
+}
+  

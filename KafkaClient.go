@@ -12,9 +12,9 @@ import (
 )
 
 // Generate tls configuration from certificates files
-func getTLSConfig(clientcertfile, clientkeyfile, cacertfile string) (*tls.Config, error) {
+func getTLSConfig(clientcertfile, clientkeyfile []byte, cacertfile string) (*tls.Config, error) {
 	// Load client cert
-	clientcert, err := tls.LoadX509KeyPair(clientcertfile, clientkeyfile)
+	clientcert, err := tls.X509KeyPair(clientcertfile, clientkeyfile)
 	if err != nil {
 		return nil, err
 	}
@@ -32,12 +32,11 @@ func getTLSConfig(clientcertfile, clientkeyfile, cacertfile string) (*tls.Config
 	tlsConfig.RootCAs = cacertpool
 	tlsConfig.Certificates = []tls.Certificate{clientcert}
 	tlsConfig.BuildNameToCertificate()
-
 	return &tlsConfig, nil
 }
 
 // getKafkaProducer creates new basic Kafka-producer.
-func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert string, tlsClientKey string, tlsCACert string) (sarama.AsyncProducer, error) {
+func getKafkaProducer(brokers []string, tlsEnabled bool, tlsClientCert, tlsClientKey []byte, tlsCACert string) (sarama.AsyncProducer, error) {
 	// Create kafka producer config
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
@@ -122,7 +121,12 @@ func ProcessResponse(kafkaProducer sarama.AsyncProducer) {
 		// Produce was failed
 		case err := <-kafkaProducer.Errors():
 			fmt.Println("err:", err)
-			WriteLog(logfileAdmin, logLevelPanic, componentKafka, err.Error())
+			fmt.Println("this is only a test")
+			if err != nil {
+				WriteLog(logfileAdmin, logLevelPanic, componentKafka, err.Error())
+			} else {
+				WriteLog(logfileAdmin, logLevelWarning, componentKafka, fmt.Sprintf("the error is %v", err))
+			}
 		}
 	}
 }
