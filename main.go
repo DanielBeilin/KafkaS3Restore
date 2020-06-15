@@ -32,7 +32,7 @@ const (
 	configAwsToken          = ""
 	configStartRestoreDate  = "start_restore_date"
 	configEndRestoreDate    = "end_restore_date"
-	configAwsDisabledSSl    = " s3_disabled_ssl"
+	configAwsDisabledSSl    = "s3_disabled_ssl"
 	configAwsForcePathStyle = "force_path_style"
 
 	configLogDir = "logdir"
