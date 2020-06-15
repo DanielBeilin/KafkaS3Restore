@@ -15,6 +15,7 @@ const (
 	logLevelInfo   = "INFO"
 	logLevelError  = "ERROR"
 	logLevelPanic  = "PANIC"
+	logLevelWarning = "WARNING"
 	componentKafka = "Kafka Producer"
 	componentS3    = "S3 client"
 	componentMain  = "Main"
